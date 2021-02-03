@@ -15,6 +15,21 @@ class QueryDBConfig(val parent: CafienneConfig) extends MandatoryConfig {
     logger.warn("Obtaining read-journal settings from 'cafienne.querydb.read-journal' is deprecated; please place these settings in 'cafienne.read-journal' instead")
     readString("read-journal", "")
   }
+
+  lazy val transactionMonitor = new TransactionMonitorConfig(this)
+}
+
+class TransactionMonitorConfig(val parent: QueryDBConfig) extends CafienneBaseConfig {
+  val path = "transaction-monitor"
+  lazy val interval: Long = {
+    val default = 0
+    val interval = readLong("log-interval", default)
+    interval <= 0 match {
+      case true => logger.info("Transaction Monitor reporting thread is not enabled")
+      case false => logger.warn("Transaction Monitor will print report every " + interval + " seconds (please note - logging is done at INFO level)")
+    }
+    interval * 1000
+  }
 }
 
 class RestartConfig(val parent: QueryDBConfig) extends CafienneBaseConfig {

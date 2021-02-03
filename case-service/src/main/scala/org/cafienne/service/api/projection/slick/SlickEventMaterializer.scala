@@ -9,15 +9,14 @@ import org.cafienne.service.api.projection.LastModifiedRegistration
 
 import scala.concurrent.Future
 
-trait SlickEventMaterializer[M <: ModelEvent[_], T <: SlickTransaction[M]] extends TaggedEventConsumer with LazyLogging {
+trait SlickEventMaterializer[M <: ModelEvent[_], T <: SlickTransaction[M]] extends TaggedEventConsumer with TransactionFactory[T] with LazyLogging {
 
   import scala.concurrent.ExecutionContext.Implicits.global
 
-  def createTransaction(actorId: String, tenant: String): T
   val lastModifiedRegistration: LastModifiedRegistration
 
-  private val transactionCache = new scala.collection.mutable.HashMap[String, T]
-  private def getTransaction(actorId: String, tenant: String) = transactionCache.getOrElseUpdate(actorId, createTransaction(actorId, tenant))
+  private val transactionCache = new TransactionMonitor[T](this.getClass.getSimpleName)
+  private def getTransaction(actorId: String, tenant: String) = transactionCache.get(actorId, tenant, (actorId, tenant) => createTransaction(actorId, tenant))
 
   def consumeModelEvent(newOffset: Offset, persistenceId: String, sequenceNr: Long, modelEvent: ModelEvent[_]): Future[Done] = {
     modelEvent match {
