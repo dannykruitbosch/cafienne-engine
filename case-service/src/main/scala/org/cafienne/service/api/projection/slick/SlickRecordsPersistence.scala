@@ -2,6 +2,7 @@ package org.cafienne.service.api.projection.slick
 
 import akka.Done
 import akka.persistence.query.Offset
+import com.typesafe.scalalogging.LazyLogging
 import org.cafienne.cmmn.akka.command.platform.NewUserInformation
 import org.cafienne.infrastructure.cqrs.OffsetRecord
 import org.cafienne.infrastructure.jdbc.OffsetStoreTables
@@ -17,7 +18,8 @@ class SlickRecordsPersistence
     with CaseTables
     with TaskTables
     with TenantTables
-    with OffsetStoreTables {
+    with OffsetStoreTables
+    with LazyLogging {
 
   import dbConfig.profile.api._
 
@@ -67,10 +69,14 @@ class SlickRecordsPersistence
   }
 
   override def updateTenantUserInformation(tenant: String, info: Seq[NewUserInformation], offsetName: String, offset: Offset): Future[Done] = {
+    logger.debug(s"Tenant $tenant: Updating ${info.length} user ids")
     val updateQueries = info.filter(u => u.newUserId != u.existingUserId).map(user => {
       (for {c <- TableQuery[UserRoleTable].filter(r => r.userId === user.existingUserId && r.tenant === tenant)} yield c.userId).update(user.newUserId)
     }) ++ getOffsetRecord(offsetName, offset)
-    db.run(DBIO.sequence(updateQueries).transactionally).map { _ => Done }
+    db.run(DBIO.sequence(updateQueries).transactionally).map { _ => {
+      logger.debug(s"Tenant $tenant: transaction to update ${info.length} user ids completed")
+      Done
+    } }
   }
 
 //  var nr = 0L
@@ -81,6 +87,7 @@ class SlickRecordsPersistence
   }
 
   def updateCaseUserInformation(caseId: String, info: Seq[NewUserInformation], offsetName: String, offset: Offset): Future[Done] = {
+    logger.debug(s"Case $caseId: Updating ${info.length} user ids")
     val updateQueries = info.map(user => {
       // Update 'createdBy' field in case instance table
       (for {cases <- TableQuery[CaseInstanceTable].filter(r => r.id === caseId && r.createdBy === user.existingUserId)} yield cases.createdBy).update(user.newUserId)
@@ -112,7 +119,10 @@ class SlickRecordsPersistence
       // Update 'memberId' field in team table
       (for {cases <- TableQuery[CaseInstanceTeamMemberTable].filter(r => r.isTenantUser && r.memberId === user.existingUserId)} yield cases.memberId).update(user.newUserId)
     }) ++ getOffsetRecord(offsetName, offset)
-    db.run(DBIO.sequence(updateQueries).transactionally).map { _ => Done }
+    db.run(DBIO.sequence(updateQueries).transactionally).map { _ => {
+      logger.debug(s"Case $caseId: transaction to update ${info.length} user ids completed")
+      Done
+    } }
   }
 
   override def getCaseInstance(id: String): Future[Option[CaseRecord]] = {
