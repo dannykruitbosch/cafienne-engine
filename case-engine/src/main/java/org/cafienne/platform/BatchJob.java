@@ -101,7 +101,7 @@ public class BatchJob implements CafienneSerializable {
     }
 
     ValueMap getHistory() {
-        return new ValueMap(Fields.identifier, batchIdentifier, "started", createdOn, "completed", completedOn, Fields.jobCount, jobCount);
+        return new ValueMap(Fields.identifier, batchIdentifier, "started", createdOn, "completed", completedOn, Fields.jobCount, jobCount, "failures", failures);
     }
 
     public ValueMap getStatus() {
